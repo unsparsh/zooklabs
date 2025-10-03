@@ -267,6 +267,8 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
 
     setIsLoading(true);
     try {
+      const hotelId = hotel._id || hotel.id;
+
       if (modalType === 'add-room') {
         const roomData = {
           number: editingRoom.number,
@@ -278,14 +280,41 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
           amenities: editingRoom.amenities,
           isActive: true
         };
-        await apiClient.createRoom(hotel._id, roomData);
+        await apiClient.createRoom(hotelId, roomData);
         toast.success('Room added successfully');
       } else {
-        await apiClient.updateRoom(hotel._id, editingRoom._id, editingRoom);
-        toast.success('Room updated successfully');
+        const roomId = editingRoom._id || editingRoom.id;
+        if (roomId) {
+          // Send only the fields that should be updated
+          const updateData = {
+            number: editingRoom.number,
+            name: editingRoom.name,
+            type: editingRoom.type,
+            status: editingRoom.status,
+            rate: editingRoom.rate,
+            maxOccupancy: editingRoom.maxOccupancy,
+            amenities: editingRoom.amenities,
+            isActive: editingRoom.isActive
+          };
+          await apiClient.updateRoom(hotelId, roomId, updateData);
+          toast.success('Room updated successfully');
+        }
       }
 
+      // Close modal and reset
       setShowModal(false);
+      setEditingRoom({
+        number: '',
+        name: '',
+        type: 'Standard',
+        status: 'available',
+        rate: 2500,
+        maxOccupancy: 2,
+        amenities: [],
+        isActive: true
+      });
+
+      // Refresh rooms
       await fetchRooms();
     } catch (error: any) {
       console.error('Failed to save room:', error);
@@ -311,28 +340,56 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
     setIsLoading(true);
     try {
       // Create guest record
+      const roomId = selectedRoom._id || selectedRoom.id;
+      const hotelId = hotel._id || hotel.id;
+
       const guestData = {
         ...guestDetails,
-        roomId: selectedRoom._id,
-        hotelId: hotel._id
+        roomId: roomId,
+        hotelId: hotelId
       };
 
-      const createdGuest = await apiClient.createGuest(hotel._id, guestData);
-      
+      const createdGuest = await apiClient.createGuest(hotelId, guestData);
+
       // Update room status to occupied with guest info
-      await apiClient.updateRoom(hotel._id, selectedRoom._id, { 
+      const guestId = createdGuest._id || createdGuest.id;
+      await apiClient.updateRoom(hotelId, roomId, {
         status: 'occupied',
-        currentGuest: {
-          name: guestDetails.name,
-          checkInDate: guestDetails.checkInDate,
-          checkOutDate: guestDetails.checkOutDate,
-          guestId: createdGuest._id
-        }
+        currentGuest: guestId
       });
 
+      // Close modal and refresh
       setShowModal(false);
+      setSelectedRoom(null);
+      setGuestDetails({
+        name: '',
+        email: '',
+        phone: '',
+        idType: 'aadhar',
+        idNumber: '',
+        address: '',
+        checkInDate: new Date().toISOString().split('T')[0],
+        checkOutDate: '',
+        adults: 1,
+        children: 0,
+        roomId: '',
+        roomNumber: '',
+        roomType: '',
+        ratePerNight: 0,
+        totalNights: 1,
+        totalAmount: 0,
+        advancePayment: 0,
+        paidAmount: 0,
+        pendingAmount: 0,
+        specialRequests: '',
+        status: 'checked-in',
+        hotelId: hotelId
+      });
+
+      // Refresh data
       await fetchRooms();
       await fetchGuests();
+
       toast.success('Guest checked in successfully!');
     } catch (error: any) {
       console.error('Check-in error:', error);
@@ -356,8 +413,9 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
 
   const handleCheckOut = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!guestDetails._id) {
+
+    const guestId = guestDetails._id || guestDetails.id;
+    if (!guestId) {
       toast.error('Guest information not found');
       return;
     }
@@ -372,8 +430,10 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
 
     setIsLoading(true);
     try {
+      const hotelId = hotel._id || hotel.id;
+
       // Update guest status and billing
-      await apiClient.updateGuest(hotel._id, guestDetails._id, {
+      await apiClient.updateGuest(hotelId, guestId, {
         status: 'checked-out',
         totalAmount: finalBill,
         paidAmount: totalPaid,
@@ -383,16 +443,44 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
       });
 
       // Update room status to available
-      await apiClient.updateRoom(hotel._id, guestDetails.roomId, { 
+      await apiClient.updateRoom(hotelId, guestDetails.roomId, {
         status: 'available',
         currentGuest: null
       });
 
+      // Close modal and reset
       setShowModal(false);
       setAdditionalCharges(0);
       setFinalPayment(0);
+      setGuestDetails({
+        name: '',
+        email: '',
+        phone: '',
+        idType: 'aadhar',
+        idNumber: '',
+        address: '',
+        checkInDate: new Date().toISOString().split('T')[0],
+        checkOutDate: '',
+        adults: 1,
+        children: 0,
+        roomId: '',
+        roomNumber: '',
+        roomType: '',
+        ratePerNight: 0,
+        totalNights: 1,
+        totalAmount: 0,
+        advancePayment: 0,
+        paidAmount: 0,
+        pendingAmount: 0,
+        specialRequests: '',
+        status: 'checked-in',
+        hotelId: hotelId
+      });
+
+      // Refresh data
       await fetchRooms();
       await fetchGuests();
+
       toast.success('Guest checked out successfully!');
     } catch (error: any) {
       console.error('Check-out error:', error);
