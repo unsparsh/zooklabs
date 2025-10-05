@@ -1787,6 +1787,11 @@ app.put(
     try {
       const updateData = { ...req.body };
 
+      console.log("📝 Room update request:", {
+        roomId: req.params.roomId,
+        updates: updateData
+      });
+
       // Handle field name conversions if needed
       if (updateData.rate !== undefined) {
         updateData.ratePerNight = updateData.rate;
@@ -1799,17 +1804,17 @@ app.put(
       const room = await Room.findByIdAndUpdate(
         req.params.roomId,
         updateData,
-        { new: true }
+        { new: true, runValidators: true }
       );
 
       if (!room) {
         return res.status(404).json({ message: "Room not found" });
       }
 
-      console.log("✅ Room updated:", room.number, "Status:", room.status);
+      console.log("✅ Room updated successfully:", room.number, "Status:", room.status, "CurrentGuest:", room.currentGuest);
       res.json(room);
     } catch (error) {
-      console.error("Error updating room:", error);
+      console.error("❌ Error updating room:", error);
       res.status(500).json({ message: "Server error", error: error.message });
     }
   }

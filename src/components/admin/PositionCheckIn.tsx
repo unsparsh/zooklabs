@@ -350,13 +350,17 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
       };
 
       const createdGuest = await apiClient.createGuest(hotelId, guestData);
+      console.log('✅ Guest created:', createdGuest);
 
       // Update room status to occupied with guest info
       const guestId = createdGuest._id || createdGuest.id;
-      await apiClient.updateRoom(hotelId, roomId, {
+      console.log('📝 Updating room status to occupied...', { roomId, guestId });
+
+      const updatedRoom = await apiClient.updateRoom(hotelId, roomId, {
         status: 'occupied',
         currentGuest: guestId
       });
+      console.log('✅ Room updated:', updatedRoom);
 
       // Close modal and refresh
       setShowModal(false);

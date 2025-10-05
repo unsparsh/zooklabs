@@ -10,39 +10,12 @@ interface RoomsPanelProps {
   hotelId: string;
 }
 
-export const RoomsPanel: React.FC<RoomsPanelProps> = ({ 
-  rooms, 
-  onRoomsUpdate, 
-  hotelId 
+export const RoomsPanel: React.FC<RoomsPanelProps> = ({
+  rooms,
+  onRoomsUpdate,
+  hotelId
 }) => {
-  const [isAddingRoom, setIsAddingRoom] = useState(false);
-  const [newRoom, setNewRoom] = useState({ number: '', name: '' });
-  const [isLoading, setIsLoading] = useState(false);
   const { theme } = useTheme();
-
-  const handleAddRoom = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newRoom.number.trim()) {
-      toast.error('Room number is required');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      await apiClient.createRoom(hotelId, {
-        number: newRoom.number,
-        name: newRoom.name || `Room ${newRoom.number}`,
-      });
-      setNewRoom({ number: '', name: '' });
-      setIsAddingRoom(false);
-      onRoomsUpdate();
-      toast.success('Room added successfully');
-    } catch (error) {
-      toast.error('Failed to add room');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleDeleteRoom = async (roomId: string) => {
     if (!confirm('Are you sure you want to delete this room?')) return;
@@ -104,70 +77,13 @@ export const RoomsPanel: React.FC<RoomsPanelProps> = ({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Rooms & QR Codes</h2>
-        <button
-          onClick={() => setIsAddingRoom(true)}
-          className="bg-blue-600 dark:bg-blue-700 text-white px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-medium hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors flex items-center gap-1 sm:gap-2"
-        >
-          <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-          <span className="hidden sm:inline">Add Room</span>
-          <span className="sm:hidden">Add</span>
-        </button>
-      </div>
-
-      {/* Add Room Form */}
-      {isAddingRoom && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 sm:p-6 transition-colors">
-          <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white mb-4">Add New Room</h3>
-          <form onSubmit={handleAddRoom} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="roomNumber" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Room Number *
-                </label>
-                <input
-                  id="roomNumber"
-                  type="text"
-                  value={newRoom.number}
-                  onChange={(e) => setNewRoom({ ...newRoom, number: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                  placeholder="e.g., 101"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="roomName" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Room Name (Optional)
-                </label>
-                <input
-                  id="roomName"
-                  type="text"
-                  value={newRoom.name}
-                  onChange={(e) => setNewRoom({ ...newRoom, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                  placeholder="e.g., Deluxe Suite"
-                />
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-              <button
-                type="button"
-                onClick={() => setIsAddingRoom(false)}
-                className="px-4 py-2 text-sm sm:text-base text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="px-4 py-2 text-sm sm:text-base bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isLoading ? 'Adding...' : 'Add Room'}
-              </button>
-            </div>
-          </form>
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Rooms & QR Codes</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Add rooms from Position/Check In panel
+          </p>
         </div>
-      )}
+      </div>
 
       {/* Rooms Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
