@@ -59,7 +59,8 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [modalType, setModalType] = useState<'checkin' | 'checkout' | 'edit-room' | 'add-room'>('checkin');
+  const [modalType, setModalType] = useState<'checkin' | 'checkout' | 'edit-room' | 'add-room' | 'move-guest'>('checkin');
+  const [targetRoom, setTargetRoom] = useState<Room | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
   const [guestDetails, setGuestDetails] = useState<Guest>({
@@ -494,6 +495,60 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
     }
   };
 
+  const handleMoveGuest = () => {
+    setModalType('move-guest');
+  };
+
+  const handleMoveGuestToRoom = async (newRoom: Room) => {
+    if (!guestDetails._id) {
+      toast.error('Guest information not found');
+      return;
+    }
+
+    if (newRoom.status !== 'available') {
+      toast.error('Target room is not available');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const hotelId = hotel._id || hotel.id;
+      const oldRoomId = guestDetails.roomId;
+      const newRoomId = newRoom._id || newRoom.id;
+
+      // Update guest with new room details
+      await apiClient.updateGuest(hotelId, guestDetails._id, {
+        roomId: newRoomId,
+        roomNumber: newRoom.number,
+        roomType: newRoom.type,
+        ratePerNight: newRoom.rate
+      });
+
+      // Update old room to available
+      await apiClient.updateRoom(hotelId, oldRoomId, {
+        status: 'available',
+        currentGuest: null
+      });
+
+      // Update new room to occupied
+      await apiClient.updateRoom(hotelId, newRoomId, {
+        status: 'occupied',
+        currentGuest: guestDetails._id
+      });
+
+      setShowModal(false);
+      setModalType('checkout');
+      await fetchRooms();
+      await fetchGuests();
+      toast.success(`Guest moved to Room ${newRoom.number}`);
+    } catch (error: any) {
+      console.error('Move guest error:', error);
+      toast.error(error.message || 'Failed to move guest');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleDeleteRoom = async (room: Room, e: React.MouseEvent) => {
     e.stopPropagation();
     
@@ -517,9 +572,9 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
   const getRoomStatusColor = (status: string) => {
     switch (status) {
       case 'available':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-200 dark:border-green-700';
+        return 'bg-green-50 border-green-300 hover:border-green-400 dark:bg-green-900 dark:border-green-700';
       case 'occupied':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-blue-200 dark:border-blue-700';
+        return 'bg-blue-50 border-blue-300 hover:border-blue-400 dark:bg-blue-900 dark:border-blue-700';
       case 'maintenance':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 border-yellow-200 dark:border-yellow-700';
       case 'out-of-order':
@@ -627,97 +682,73 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
       </div>
 
       {/* Rooms Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
         {rooms.map((room) => (
           <div
             key={room._id}
-            className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border-2 cursor-pointer transition-all hover:shadow-md ${getRoomStatusColor(room.status)}`}
+            className={`rounded-lg shadow-sm p-3 border-2 cursor-pointer transition-all hover:shadow-md ${getRoomStatusColor(room.status)}`}
             onClick={() => handleRoomClick(room)}
           >
-            <div className="flex justify-between items-start mb-3">
+            <div className="flex justify-between items-start mb-2">
               <div>
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Room {room.number}</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-300">{room.name || room.type}</p>
+                <h4 className="text-base font-bold text-gray-900 dark:text-white">R{room.number}</h4>
+                <p className="text-xs text-gray-600 dark:text-gray-300 truncate">{room.type}</p>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center">
                 {getRoomStatusIcon(room.status)}
-                <span className="text-sm font-medium capitalize">{room.status.replace('-', ' ')}</span>
               </div>
             </div>
 
-            <div className="space-y-2 text-sm mb-4">
+            <div className="space-y-1 text-xs mb-2">
               <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-300">Type:</span>
-                <span className="font-medium text-gray-900 dark:text-white">{room.type}</span>
+                <span className="text-gray-600 dark:text-gray-400">Rate:</span>
+                <span className="font-semibold text-gray-900 dark:text-white">₹{room.rate}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-300">Rate:</span>
-                <span className="font-medium text-gray-900 dark:text-white">₹{room.rate}/night</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-300">Max Guests:</span>
+                <span className="text-gray-600 dark:text-gray-400">Guests:</span>
                 <span className="font-medium text-gray-900 dark:text-white">{room.maxOccupancy}</span>
               </div>
-              {room.amenities && room.amenities.length > 0 && (
-                <div>
-                  <span className="text-gray-600 dark:text-gray-300">Amenities:</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {room.amenities.slice(0, 3).map((amenity) => (
-                      <span key={amenity} className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-xs">
-                        {amenity}
-                      </span>
-                    ))}
-                    {room.amenities.length > 3 && (
-                      <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-xs">
-                        +{room.amenities.length - 3} more
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Current Guest Info */}
-            {room.status === 'occupied' && room.currentGuest && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3 mb-4">
-                <h5 className="font-medium text-blue-900 dark:text-blue-300 mb-1">Current Guest</h5>
-                <p className="text-sm text-blue-700 dark:text-blue-300">{room.currentGuest.name}</p>
-                <p className="text-xs text-blue-600 dark:text-blue-400">
-                  {new Date(room.currentGuest.checkInDate).toLocaleDateString()} - {new Date(room.currentGuest.checkOutDate).toLocaleDateString()}
-                </p>
+            {room.status === 'occupied' && (
+              <div className="bg-blue-100 dark:bg-blue-900/30 rounded p-2 mb-2">
+                <p className="text-xs font-medium text-blue-900 dark:text-blue-200 truncate">Occupied</p>
               </div>
             )}
 
             {/* Room Action Buttons */}
-            <div className="flex gap-2">
-              <button
-                onClick={(e) => handleEditRoom(room, e)}
-                className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 px-3 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center justify-center gap-1"
-              >
-                <Edit className="h-3 w-3" />
-                Edit
-              </button>
-              
+            <div className="flex gap-1">
+              {room.status !== 'occupied' && (
+                <button
+                  onClick={(e) => handleEditRoom(room, e)}
+                  className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-1.5 px-2 rounded text-xs font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center justify-center gap-1"
+                >
+                  <Edit className="h-3 w-3" />
+                </button>
+              )}
+
               {room.status !== 'occupied' && (
                 <button
                   onClick={(e) => handleRoomStatusChange(room, room.status === 'maintenance' ? 'available' : 'maintenance', e)}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                  className={`flex-1 py-1.5 px-2 rounded text-xs font-medium transition-colors flex items-center justify-center ${
                     room.status === 'maintenance'
                       ? 'bg-green-600 text-white hover:bg-green-700'
                       : 'bg-yellow-600 text-white hover:bg-yellow-700'
                   }`}
                 >
                   <Wrench className="h-3 w-3" />
-                  {room.status === 'maintenance' ? 'Fix Done' : 'Maintenance'}
                 </button>
               )}
 
-              <button
-                onClick={(e) => handleDeleteRoom(room, e)}
-                className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-              >
-                <Trash2 className="h-3 w-3" />
-              </button>
+              {room.status !== 'occupied' && (
+                <button
+                  onClick={(e) => handleDeleteRoom(room, e)}
+                  className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              )}
             </div>
 
             {/* Click Action Hint */}
@@ -1014,11 +1045,19 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
                 <form onSubmit={handleCheckOut} className="space-y-4">
                   {/* Guest Information Display */}
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">{guestDetails.name}</h4>
+                    <h4 className="font-semibold text-gray-900 dark:text-white mb-3">{guestDetails.name}</h4>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <p className="text-gray-600 dark:text-gray-300">Room</p>
                         <p className="font-medium text-gray-900 dark:text-white">{guestDetails.roomNumber} ({guestDetails.roomType})</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 dark:text-gray-300">Check-in Date</p>
+                        <p className="font-medium text-gray-900 dark:text-white">{guestDetails.checkInDate ? new Date(guestDetails.checkInDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 dark:text-gray-300">Check-out Date</p>
+                        <p className="font-medium text-gray-900 dark:text-white">{guestDetails.checkOutDate ? new Date(guestDetails.checkOutDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}</p>
                       </div>
                       <div>
                         <p className="text-gray-600 dark:text-gray-300">Stay Duration</p>
@@ -1026,11 +1065,19 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
                       </div>
                       <div>
                         <p className="text-gray-600 dark:text-gray-300">Guests</p>
-                        <p className="font-medium text-gray-900 dark:text-white">{guestDetails.adults + guestDetails.children}</p>
+                        <p className="font-medium text-gray-900 dark:text-white">{guestDetails.adults} adults{guestDetails.children > 0 ? `, ${guestDetails.children} children` : ''}</p>
                       </div>
                       <div>
                         <p className="text-gray-600 dark:text-gray-300">Phone</p>
                         <p className="font-medium text-gray-900 dark:text-white">{guestDetails.phone}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 dark:text-gray-300">Email</p>
+                        <p className="font-medium text-gray-900 dark:text-white">{guestDetails.email || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 dark:text-gray-300">ID Type</p>
+                        <p className="font-medium text-gray-900 dark:text-white capitalize">{guestDetails.idType?.replace('-', ' ')}</p>
                       </div>
                     </div>
                   </div>
@@ -1096,6 +1143,14 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
                       Cancel
                     </button>
                     <button
+                      type="button"
+                      onClick={handleMoveGuest}
+                      className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <MapPin className="h-4 w-4" />
+                      Move Room
+                    </button>
+                    <button
                       type="submit"
                       disabled={isLoading}
                       className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
@@ -1108,12 +1163,54 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
                       ) : (
                         <>
                           <LogOut className="h-4 w-4" />
-                          Complete Check-out
+                          Check-out
                         </>
                       )}
                     </button>
                   </div>
                 </form>
+              )}
+
+              {/* Move Guest Form */}
+              {modalType === 'move-guest' && (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+                    <h4 className="font-medium text-blue-900 dark:text-blue-200 mb-2">Moving Guest: {guestDetails.name}</h4>
+                    <p className="text-sm text-blue-700 dark:text-blue-300">Current Room: {guestDetails.roomNumber}</p>
+                  </div>
+
+                  <div>
+                    <h5 className="font-medium text-gray-900 dark:text-white mb-3">Select New Room</h5>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+                      {rooms.filter(r => r.status === 'available').map((room) => (
+                        <button
+                          key={room._id}
+                          type="button"
+                          onClick={() => handleMoveGuestToRoom(room)}
+                          disabled={isLoading}
+                          className="bg-green-50 border-2 border-green-300 hover:border-green-500 dark:bg-green-900/20 dark:border-green-700 dark:hover:border-green-500 rounded-lg p-3 text-left transition-all disabled:opacity-50"
+                        >
+                          <div className="font-bold text-gray-900 dark:text-white">Room {room.number}</div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400">{room.type}</div>
+                          <div className="text-sm font-medium text-green-700 dark:text-green-300 mt-1">₹{room.rate}/night</div>
+                        </button>
+                      ))}
+                    </div>
+                    {rooms.filter(r => r.status === 'available').length === 0 && (
+                      <p className="text-center text-gray-500 dark:text-gray-400 py-8">No available rooms to move to</p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setModalType('checkout')}
+                      className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      Back
+                    </button>
+                  </div>
+                </div>
               )}
 
               {/* Room Edit/Add Form */}
