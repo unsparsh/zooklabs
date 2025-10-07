@@ -564,7 +564,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, hotel, onL
                     {sidebarItems.find(item => item.id === activeTab)?.label || 'Dashboard'}
                   </h1>
                   <p className="text-sm text-gray-600 dark:text-gray-300">
-                    Hotel Demo Indore • {new Date().toLocaleDateString()}
+                    {hotel.name} • {new Date().toLocaleDateString()}
                   </p>
                 </div>
               </div>
