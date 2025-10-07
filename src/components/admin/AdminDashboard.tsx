@@ -504,7 +504,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, hotel, onL
                 <Users className="h-5 w-5" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-gray-900 dark:text-white">ProfitLabs</h1>
+                <h1 className="text-lg font-bold text-gray-900 dark:text-white">ZookLabs</h1>
                 <p className="text-xs text-gray-600 dark:text-gray-300 truncate">{hotel.name}</p>
               </div>
             </div>
