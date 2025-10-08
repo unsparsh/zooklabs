@@ -102,6 +102,8 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
 
   const [additionalCharges, setAdditionalCharges] = useState(0);
   const [finalPayment, setFinalPayment] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState<string>('Cash');
+  const [advancePaymentMethod, setAdvancePaymentMethod] = useState<string>('Cash');
 
   const roomTypes = ['Standard', 'Deluxe', 'Suite', 'Premium', 'Executive'];
   const idTypes = [
@@ -113,9 +115,11 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
   ];
 
   const amenitiesList = [
-    'AC', 'WiFi', 'TV', 'Mini Bar', 'Balcony', 'Sea View', 'City View', 
+    'AC', 'WiFi', 'TV', 'Mini Bar', 'Balcony', 'Sea View', 'City View',
     'Bathtub', 'Shower', 'Room Service', 'Laundry', 'Safe'
   ];
+
+  const paymentMethods = ['Cash', 'Credit Card', 'Debit Card', 'UPI', 'Net Banking', 'Other'];
 
   useEffect(() => {
     fetchRooms();
@@ -363,6 +367,22 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
       });
       console.log('✅ Room updated:', updatedRoom);
 
+      // Create transaction for advance payment if any
+      if (guestDetails.advancePayment > 0) {
+        await apiClient.createTransaction(hotelId, {
+          guestId: guestId,
+          roomId: roomId,
+          guestName: guestDetails.name,
+          roomNumber: selectedRoom.number,
+          amount: guestDetails.advancePayment,
+          type: 'Check-in Advance',
+          status: 'completed',
+          paymentMethod: advancePaymentMethod,
+          description: `Advance payment for Room ${selectedRoom.number} - Check-in`
+        });
+        console.log('✅ Check-in advance transaction created');
+      }
+
       // Close modal and refresh
       setShowModal(false);
       setSelectedRoom(null);
@@ -452,6 +472,38 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
         status: 'available',
         currentGuest: null
       });
+
+      // Create transaction for final payment if any
+      if (finalPayment > 0) {
+        await apiClient.createTransaction(hotelId, {
+          guestId: guestId,
+          roomId: guestDetails.roomId,
+          guestName: guestDetails.name,
+          roomNumber: guestDetails.roomNumber,
+          amount: finalPayment,
+          type: 'Check-out Payment',
+          status: 'completed',
+          paymentMethod: paymentMethod,
+          description: `Final payment for Room ${guestDetails.roomNumber} - Check-out (Bill: ₹${finalBill.toLocaleString()})`
+        });
+        console.log('✅ Check-out payment transaction created');
+      }
+
+      // Create transaction for additional charges if any
+      if (additionalCharges > 0) {
+        await apiClient.createTransaction(hotelId, {
+          guestId: guestId,
+          roomId: guestDetails.roomId,
+          guestName: guestDetails.name,
+          roomNumber: guestDetails.roomNumber,
+          amount: additionalCharges,
+          type: 'Additional Charges',
+          status: 'completed',
+          paymentMethod: paymentMethod,
+          description: `Additional charges for Room ${guestDetails.roomNumber}`
+        });
+        console.log('✅ Additional charges transaction created');
+      }
 
       // Close modal and reset
       setShowModal(false);
@@ -947,26 +999,42 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Advance Payment
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={guestDetails.advancePayment}
-                      onChange={(e) => {
-                        const advance = parseFloat(e.target.value) || 0;
-                        setGuestDetails({ 
-                          ...guestDetails, 
-                          advancePayment: advance,
-                          paidAmount: advance,
-                          pendingAmount: guestDetails.totalAmount - advance
-                        });
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      placeholder="Enter advance payment amount"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Advance Payment
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={guestDetails.advancePayment}
+                        onChange={(e) => {
+                          const advance = parseFloat(e.target.value) || 0;
+                          setGuestDetails({
+                            ...guestDetails,
+                            advancePayment: advance,
+                            paidAmount: advance,
+                            pendingAmount: guestDetails.totalAmount - advance
+                          });
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="Enter advance payment amount"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Payment Method
+                      </label>
+                      <select
+                        value={advancePaymentMethod}
+                        onChange={(e) => setAdvancePaymentMethod(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      >
+                        {paymentMethods.map((method) => (
+                          <option key={method} value={method}>{method}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   <div>
@@ -1113,16 +1181,30 @@ export const PositionCheckIn: React.FC<PositionCheckInProps> = ({ hotel }) => {
                         <span className="text-green-600 dark:text-green-400">₹{guestDetails.paidAmount.toLocaleString()}</span>
                       </div>
 
-                      <div>
-                        <label className="block text-gray-600 dark:text-gray-300 mb-1">Additional Payment</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={finalPayment}
-                          onChange={(e) => setFinalPayment(parseFloat(e.target.value) || 0)}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                          placeholder="Final payment amount"
-                        />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-gray-600 dark:text-gray-300 mb-1">Additional Payment</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={finalPayment}
+                            onChange={(e) => setFinalPayment(parseFloat(e.target.value) || 0)}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            placeholder="Final payment amount"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-600 dark:text-gray-300 mb-1">Payment Method</label>
+                          <select
+                            value={paymentMethod}
+                            onChange={(e) => setPaymentMethod(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          >
+                            {paymentMethods.map((method) => (
+                              <option key={method} value={method}>{method}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
 
                       <div className="flex justify-between border-t border-gray-200 dark:border-gray-600 pt-2">

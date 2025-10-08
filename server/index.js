@@ -333,6 +333,49 @@ const RoomServiceItem = mongoose.model(
 const ComplaintItem = mongoose.model("ComplaintItem", complaintItemSchema);
 const Guest = mongoose.model("Guest", guestSchema);
 
+// Transaction Schema
+const transactionSchema = new mongoose.Schema(
+  {
+    hotelId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Hotel",
+      required: true,
+    },
+    guestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Guest",
+      required: true,
+    },
+    roomId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Room",
+    },
+    guestName: { type: String, required: true },
+    roomNumber: { type: String },
+    amount: { type: Number, required: true },
+    type: {
+      type: String,
+      enum: ["Check-in Advance", "Check-out Payment", "Additional Charges", "Refund"],
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["completed", "pending", "failed", "refunded"],
+      default: "completed",
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["Cash", "Credit Card", "Debit Card", "UPI", "Net Banking", "Other"],
+      required: true,
+    },
+    description: { type: String },
+    transactionId: { type: String, unique: true, required: true },
+  },
+  { timestamps: true }
+);
+
+const Transaction = mongoose.model("Transaction", transactionSchema);
+
 // Google Auth Schema
 const googleAuthSchema = new mongoose.Schema(
   {
@@ -1792,14 +1835,7 @@ app.put(
         updates: updateData
       });
 
-      // Handle field name conversions if needed
-      if (updateData.rate !== undefined) {
-        updateData.ratePerNight = updateData.rate;
-        delete updateData.rate;
-      }
-      if (updateData.maxOccupancy !== undefined && updateData.maxOccupancy !== null) {
-        // Keep maxOccupancy as is
-      }
+      // No field conversion needed - schema uses 'rate' field directly
 
       const room = await Room.findByIdAndUpdate(
         req.params.roomId,
@@ -1935,6 +1971,76 @@ app.delete(
     } catch (error) {
       console.error("Error deleting guest:", error);
       res.status(500).json({ message: "Failed to delete guest", error: error.message });
+    }
+  }
+);
+
+// Transaction routes
+app.get(
+  "/api/hotels/:hotelId/transactions",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const transactions = await Transaction.find({ hotelId: req.params.hotelId })
+        .populate('guestId', 'name phone email')
+        .populate('roomId', 'number type')
+        .sort({ createdAt: -1 });
+      res.json(transactions);
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+      res.status(500).json({ message: "Failed to fetch transactions", error: error.message });
+    }
+  }
+);
+
+app.post(
+  "/api/hotels/:hotelId/transactions",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { hotelId } = req.params;
+      const transactionData = req.body;
+
+      // Generate unique transaction ID
+      const transactionId = `TXN${Date.now()}${Math.floor(Math.random() * 1000)}`;
+
+      const transaction = new Transaction({
+        ...transactionData,
+        hotelId,
+        transactionId,
+      });
+
+      await transaction.save();
+      console.log("✅ Transaction created:", transactionId, "Amount:", transaction.amount, "Method:", transaction.paymentMethod);
+
+      res.status(201).json(transaction);
+    } catch (error) {
+      console.error("Error creating transaction:", error);
+      res.status(500).json({ message: "Failed to create transaction", error: error.message });
+    }
+  }
+);
+
+app.get(
+  "/api/hotels/:hotelId/transactions/:transactionId",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const transaction = await Transaction.findOne({
+        _id: req.params.transactionId,
+        hotelId: req.params.hotelId,
+      })
+        .populate('guestId', 'name phone email')
+        .populate('roomId', 'number type');
+
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      res.json(transaction);
+    } catch (error) {
+      console.error("Error fetching transaction:", error);
+      res.status(500).json({ message: "Failed to fetch transaction", error: error.message });
     }
   }
 );

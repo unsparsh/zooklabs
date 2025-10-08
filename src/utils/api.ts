@@ -244,6 +244,22 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // Transaction endpoints
+  async getTransactions(hotelId: string) {
+    return this.request<any[]>(`/hotels/${hotelId}/transactions`);
+  }
+
+  async createTransaction(hotelId: string, transactionData: any) {
+    return this.request<any>(`/hotels/${hotelId}/transactions`, {
+      method: 'POST',
+      body: JSON.stringify(transactionData),
+    });
+  }
+
+  async getTransaction(hotelId: string, transactionId: string) {
+    return this.request<any>(`/hotels/${hotelId}/transactions/${transactionId}`);
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);
